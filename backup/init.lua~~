@@ -2,16 +2,6 @@
 vim.g.mapleader = " "
 vim.g.maplocalleader = " "
 
--- Side Scroll Settings
-vim.o.wrap = false
-vim.o.sidescrolloff = 5
-
-
--- Agregar directorios al PATH
-local home = os.getenv("HOME")
-vim.env.PATH = home .. "/.local/share/nvim/mason/bin:" .. home .. "/.local/bin:" .. home .. "/.local/bin:" .. home .. "/go/bin:" .. home .. "/usr/local/bin:" .. home .. "/opt/homebrew/bin:" .. home .. "/opt/homebrew/sbin:" .. home .. "/Applications/iTerm.app/Contents/Resources/utilities:" .. vim.env.PATH
-
-
 -- Yank to Clipboard
 vim.opt.clipboard = "unnamedplus"
 
@@ -70,10 +60,7 @@ Plug 'nvim-lua/plenary.nvim'
 Plug 'nvim-tree/nvim-tree.lua'
 
 " Syntax highlighting and more
-Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
-
-" Rainbow parentheses
-Plug 'p00f/nvim-ts-rainbow'
+Plug 'nvim-treesitter/nvim-treesitter'
 
 " Status line
 Plug 'nvim-lualine/lualine.nvim'
@@ -250,7 +237,7 @@ vim.keymap.set("n", "<leader>fh", builtin.help_tags, { desc = "Find help tags" }
 -- Mason and mason-lspconfig setup
 require("mason").setup()
 require("mason-lspconfig").setup({
-    ensure_installed = { "pyright", "lua_ls", "gopls", "rust_analyzer" }, -- Removed "tsserver"
+    ensure_installed = { "pyright", "lua_ls", "gopls", "rust_analyzer" }, -- Add more as needed
     automatic_installation = true,
 })
 
@@ -261,29 +248,25 @@ local lspconfig = require('lspconfig')
 local cmp_nvim_lsp = require('cmp_nvim_lsp')
 local capabilities = cmp_nvim_lsp.default_capabilities(vim.lsp.protocol.make_client_capabilities())
 
--- Función común para configurar atajos de LSP
-local on_attach = function(client, bufnr)
-    -- LSP keybindings
-    local opts = { noremap=true, silent=true }
-    local buf_set_keymap = function(...) vim.api.nvim_buf_set_keymap(bufnr, ...) end
-
-    -- Define LSP keybindings
-    buf_set_keymap('n', 'gd', '<Cmd>lua vim.lsp.buf.definition()<CR>', opts)
-    buf_set_keymap('n', 'K', '<Cmd>lua vim.lsp.buf.hover()<CR>', opts)
-    buf_set_keymap('n', 'gi', '<cmd>lua vim.lsp.buf.implementation()<CR>', opts)
-    buf_set_keymap('n', '<leader>rn', '<cmd>lua vim.lsp.buf.rename()<CR>', opts)
-    buf_set_keymap('n', '<leader>ca', '<cmd>lua vim.lsp.buf.code_action()<CR>', opts)
-    buf_set_keymap('n', 'gr', '<cmd>lua vim.lsp.buf.references()<CR>', opts)
-    buf_set_keymap('n', '<leader>f', '<cmd>lua vim.lsp.buf.formatting()<CR>', opts)
-end
-
--- Setup para Python (pyright)
+-- Setup for Python (pyright)
 lspconfig.pyright.setup{
     capabilities = capabilities,
-    on_attach = on_attach,
+    on_attach = function(client, bufnr)
+        -- Puedes agregar keybindings o funciones adicionales aquí
+    end,
 }
 
--- Setup para Lua (lua_ls)
+-- Setup for JavaScript/TypeScript (tsserver)
+lspconfig.tsserver.setup{
+    capabilities = capabilities,
+    on_attach = function(client, bufnr)
+        -- Disable tsserver formatting to use another formatter (e.g., prettier)
+        client.server_capabilities.documentFormattingProvider = false
+        client.server_capabilities.documentRangeFormattingProvider = false
+    end,
+}
+
+-- Setup for Lua (lua_ls)
 lspconfig.lua_ls.setup{
     capabilities = capabilities,
     settings = {
@@ -303,29 +286,32 @@ lspconfig.lua_ls.setup{
             },
         }
     },
-    on_attach = on_attach,
 }
 
--- Setup para Go (gopls)
+-- Setup for Go (gopls)
 lspconfig.gopls.setup{
     capabilities = capabilities,
-    on_attach = on_attach,
+    on_attach = function(client, bufnr)
+        -- Configuraciones específicas para Go
+    end,
 }
 
--- Setup para Rust (rust_analyzer)
+-- Setup for Rust (rust_analyzer)
 lspconfig.rust_analyzer.setup{
     capabilities = capabilities,
-    on_attach = on_attach,
+    on_attach = function(client, bufnr)
+        -- Configuraciones específicas para Rust
+    end,
 }
 
--- Configuración de autocompletado usando nvim-cmp
+-- Autocompletion setup using nvim-cmp
 local cmp = require'cmp'
 
 cmp.setup({
     snippet = {
-        -- REQUIRED: Configurar el motor de snippets
+        -- REQUIRED: Configure snippet engine
         expand = function(args)
-            require('luasnip').lsp_expand(args.body) -- Para usuarios de `luasnip`
+            require('luasnip').lsp_expand(args.body) -- For `luasnip` users.
         end,
     },
     mapping = cmp.mapping.preset.insert({
@@ -333,7 +319,7 @@ cmp.setup({
         ['<C-f>'] = cmp.mapping.scroll_docs(4),
         ['<C-Space>'] = cmp.mapping.complete(),
         ['<C-e>'] = cmp.mapping.abort(),
-        ['<CR>'] = cmp.mapping.confirm({ select = false }), -- Confirmar selección
+        ['<CR>'] = cmp.mapping.confirm({ select = false }), -- Confirm selection
         ['<Tab>'] = cmp.mapping(function(fallback)
             if cmp.visible() then
                 cmp.select_next_item()
@@ -355,15 +341,15 @@ cmp.setup({
         end, { 'i', 's' }),
     }),
     sources = cmp.config.sources({
-        { name = 'nvim_lsp' },        -- Autocompletado de LSP
+        { name = 'nvim_lsp' },        -- LSP completions
         { name = 'luasnip' },         -- Snippets
     }, {
-        { name = 'buffer' },          -- Autocompletado del buffer
-        { name = 'path' },            -- Autocompletado de rutas
+        { name = 'buffer' },          -- Buffer completions
+        { name = 'path' },            -- Path completions
     }),
     formatting = {
         format = function(entry, vim_item)
-            -- Personalizar cómo se muestran los elementos de completado
+            -- Customize how completion items are displayed
             vim_item.kind = string.format('%s', vim_item.kind)
             vim_item.menu = ({
                 nvim_lsp = "[LSP]",
@@ -375,12 +361,12 @@ cmp.setup({
         end
     },
     experimental = {
-        ghost_text = true, -- Mostrar texto fantasma (sugerencias en línea)
+        ghost_text = true, -- Show ghost text (inline suggestions)
         native_menu = false,
     },
 })
 
--- Usar fuente del buffer para `/` y `?` en modo de línea de comandos
+-- Use buffer source for `/` and `?` in command-line mode
 cmp.setup.cmdline({ '/', '?' }, {
     mapping = cmp.mapping.preset.cmdline(),
     sources = {
@@ -388,7 +374,7 @@ cmp.setup.cmdline({ '/', '?' }, {
     }
 })
 
--- Usar fuentes de cmdline y path para ':' en modo de línea de comandos
+-- Use cmdline & path source for ':' in command-line mode
 cmp.setup.cmdline(':', {
     mapping = cmp.mapping.preset.cmdline(),
     sources = cmp.config.sources({
@@ -398,21 +384,21 @@ cmp.setup.cmdline(':', {
     })
 })
 
--- Configuración de LuaSnip
+-- LuaSnip setup
 local luasnip = require 'luasnip'
 
--- Cargar friendly-snippets o tus snippets personalizados
+-- Load friendly-snippets or your custom snippets
 require("luasnip.loaders.from_vscode").lazy_load()
 
--- Opcional: Define tus propios snippets aquí
--- Ejemplo:
+-- Optional: Define your own snippets here
+-- Example:
 -- luasnip.snippets = {
 --   lua = {
 --     luasnip.parser.parse_snippet("fn", "function() \n\t$1 \nend"),
 --   },
 -- }
 
--- Autocomando para cerrar nvim-tree cuando es la última ventana
+-- Autocommand to close nvim-tree when it's the last window
 vim.api.nvim_create_autocmd("BufEnter", {
     callback = function()
         local api = require("nvim-tree.api")
@@ -423,54 +409,43 @@ vim.api.nvim_create_autocmd("BufEnter", {
     group = vim.api.nvim_create_augroup("NvimTreeCloseOnOpen", { clear = true }),
 })
 
--- Configuración de Auto-save
+-- Auto-save setup
 require("auto-save").setup {
-    enabled = true, -- Iniciar auto-save cuando el plugin se carga
+    enabled = true, -- Start auto-save when the plugin is loaded
     execution_message = {
         message = "AutoSave: saved at " .. vim.fn.strftime("%H:%M:%S"),
         dim = 0.18,
         cleaning_interval = 1000,
     },
-    trigger_events = {"InsertLeave", "TextChanged"}, -- Auto-save en estos eventos
+    trigger_events = {"InsertLeave", "TextChanged"}, -- Auto-save on these events
     condition = function(buf)
         local fn = vim.fn
-        -- No auto-save si es un buffer de terminal
+        -- Don't auto-save if it's a terminal buffer
         if fn.getbufvar(buf, "&buftype") == "terminal" then
             return false
         end
-        -- No auto-save si el buffer no es modificable
+        -- Don't auto-save if the buffer is not modifiable
         if not vim.bo[buf].modifiable then
             return false
         end
-        -- Opcional: excluir ciertos tipos de archivos
+        -- Optionally, exclude certain filetypes
         local excluded_filetypes = {"gitcommit", "gitrebase"}
         if vim.tbl_contains(excluded_filetypes, vim.bo[buf].filetype) then
             return false
         end
         return true
     end,
-    write_all_buffers = false, -- Si es true, todos los buffers serán escritos
-    debounce_delay = 135, -- Retardo en ms
+    write_all_buffers = false, -- If true, all buffers will be written
+    debounce_delay = 135, -- Delay in ms
 }
 
--- Keymap para guardar todo y salir
+-- Keymap to save all and quit
 vim.keymap.set("n", "<leader>q", ":wqall<CR>", { noremap = true, silent = true, desc = "Save all and quit" })
 
--- Keybindings para guardar
--- Guardar el buffer actual
+-- Keybindings for saving
+-- Save the current buffer
 vim.keymap.set("n", "<leader>w", ":w<CR>", { noremap = true, silent = true, desc = "Save Current Buffer" })
 
--- Guardar todos los buffers
+-- Save all buffers
 vim.keymap.set("n", "<leader>S", ":wa<CR>", { noremap = true, silent = true, desc = "Save All Buffers" })
 
--- Keybinding for running a Python file in a new terminal tab
-vim.keymap.set('n', '<leader>r', function()
-    if vim.bo.filetype == 'python' then
-        vim.cmd('write') -- Save the current file
-        local file_path = vim.fn.expand('%:p') -- Get the full path of the current file
-        vim.fn.system(string.format("osascript -e 'tell application \"iTerm\" to create window with default profile'"))
-        vim.fn.system(string.format("osascript -e 'tell application \"iTerm\" to tell current session of current window to write text \"python3 %s\"'", file_path))
-    else
-        print("Not a Python file")
-    end
-end, { noremap = true, silent = true, desc = "Run Python File in New Terminal Tab" })
